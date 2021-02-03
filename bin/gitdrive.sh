@@ -51,7 +51,7 @@ function sync {
     else
         log "rebasing onto remote changes ..."
         git rebase origin/master || true
-        while [ -n "$(git diff --check)" ]; do
+        while [ -n "$(git diff --name-only --diff-filter=U)" ]; do
             log "resolving conflicts ..."
             for f in $(git diff --name-only --diff-filter=U); do
                 log "resolving conflict in ${f} ..."

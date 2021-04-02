@@ -25,7 +25,14 @@ enum ExecError {
     },
 }
 
-impl Error for ExecError {}
+impl Error for ExecError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match *self {
+            ExecError::NonZeroExit { .. } => None,
+            ExecError::IO { ref err, .. } => Some(err.as_ref()),
+        }
+    }
+}
 
 impl fmt::Display for ExecError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

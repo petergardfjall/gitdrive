@@ -3,10 +3,42 @@ extern crate chrono;
 use chrono::Utc;
 use log;
 use std::error::Error;
+use std::fmt;
 use std::io;
 use std::path::Path;
 use std::process::Command;
 use std::str;
+
+
+type ExecResult<T> = std::result::Result<T, ExecError>;
+
+#[derive(Debug)]
+enum ExecError {
+    NonZeroExit {
+        cmd: String,
+        stderr: String,
+        status: std::process::ExitStatus,
+    },
+    IO {
+        cmd: String,
+        err: Box<dyn std::error::Error>,
+    },
+}
+
+impl Error for ExecError {}
+
+impl fmt::Display for ExecError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self {
+            ExecError::NonZeroExit {
+                cmd,
+                stderr,
+                status,
+            } => write!(f, "{}: non-zero exit ({}):\n{}", cmd, status, stderr),
+            ExecError::IO { cmd, err } => write!(f, "{}: i/o error: {}", cmd, err),
+        }
+    }
+}
 
 struct Executer<'a> {
     work_dir: &'a str,
@@ -17,23 +49,32 @@ impl<'a> Executer<'a> {
         Executer { work_dir }
     }
 
-    fn exec(&self, cmd: &str) -> Result<String, Box<dyn Error>> {
+    fn exec(&self, cmd: &str) -> ExecResult<String> {
         log::debug!("{}", cmd);
+
         let output = Command::new("/bin/sh")
             .current_dir(Path::new(&self.work_dir))
             .arg("-c")
             .arg(cmd)
-            .output()?;
+            .output()
+            .map_err(|err| ExecError::IO {
+                cmd: String::from(cmd),
+                err: Box::new(err),
+            })?;
 
         if !output.status.success() {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                String::from_utf8_lossy(&output.stderr),
-            )));
+            return Err(ExecError::NonZeroExit {
+                cmd: String::from(cmd),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                status: output.status,
+            });
         }
-        let stdout = String::from_utf8(output.stdout)?;
+        let stdout = String::from_utf8(output.stdout).map_err(|e| ExecError::IO {
+            cmd: String::from(cmd),
+            err: Box::new(e),
+        })?;
         log::trace!("{}", stdout);
-        Ok(String::from(stdout))
+        Ok(stdout)
     }
 }
 
@@ -95,7 +136,7 @@ pub struct GitDrive<'a> {
 }
 
 impl<'a> GitDrive<'a> {
-    pub fn new(opts: GitDriveOpts<'a>) -> Result<GitDrive<'a>, io::Error> {
+    pub fn new(opts: GitDriveOpts<'a>) -> std::result::Result<GitDrive<'a>, io::Error> {
         opts.validate()?;
 
         Ok(GitDrive {
@@ -104,7 +145,7 @@ impl<'a> GitDrive<'a> {
         })
     }
 
-    pub fn sync(&self) -> Result<(), Box<dyn Error>> {
+    pub fn sync(&self) -> std::result::Result<(), Box<dyn Error>> {
         log::info!("syncing ...");
 
         //
@@ -190,7 +231,7 @@ impl<'a> GitDrive<'a> {
         !self.executer.exec("git ls-remote --exit-code -h").is_err()
     }
 
-    fn resolve_conflicts(&self) -> Result<(), Box<dyn Error>> {
+    fn resolve_conflicts(&self) -> std::result::Result<(), Box<dyn Error>> {
         // while there still are conflicts we resolve them in our favor
         loop {
             let out = self

@@ -4,16 +4,14 @@ use chrono::Utc;
 use log;
 use std::error::Error;
 use std::fmt;
-use std::io;
 use std::path::Path;
 use std::process::Command;
 use std::str;
 
-
 type ExecResult<T> = std::result::Result<T, ExecError>;
 
 #[derive(Debug)]
-enum ExecError {
+pub enum ExecError {
     NonZeroExit {
         cmd: String,
         stderr: String,
@@ -27,7 +25,7 @@ enum ExecError {
 
 impl Error for ExecError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match *self {
+        match &self {
             ExecError::NonZeroExit { .. } => None,
             ExecError::IO { ref err, .. } => Some(err.as_ref()),
         }
@@ -85,6 +83,55 @@ impl<'a> Executer<'a> {
     }
 }
 
+type Result<T> = std::result::Result<T, GitDriveError>;
+
+#[derive(Debug)]
+pub enum GitDriveError {
+    NoSuchDir { path: String },
+    NoGitRepo { path: String },
+    RemoteNotFound { remote: String },
+    BranchNotFound { branch: String },
+    Exec(ExecError),
+    ParseError { message: String },
+}
+
+impl Error for GitDriveError {}
+
+impl fmt::Display for GitDriveError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self {
+            GitDriveError::NoSuchDir { path } => write!(f, "no such directory: {}", path),
+            GitDriveError::NoGitRepo { path } => write!(f, "not a git directory: {}", path),
+            GitDriveError::RemoteNotFound { remote } => {
+                write!(f, "remote does not exist: {}", remote)
+            }
+            GitDriveError::BranchNotFound { branch } => {
+                write!(f, "branch does not exist: {}", branch)
+            }
+            GitDriveError::Exec(e) => {
+                write!(f, "execution error: {:?}", e)
+            }
+            GitDriveError::ParseError { message } => {
+                write!(f, "parse error: {:?}", message)
+            }
+        }
+    }
+}
+
+impl From<ExecError> for GitDriveError {
+    fn from(err: ExecError) -> GitDriveError {
+        GitDriveError::Exec(err)
+    }
+}
+
+impl From<std::num::ParseIntError> for GitDriveError {
+    fn from(err: std::num::ParseIntError) -> GitDriveError {
+        GitDriveError::ParseError {
+            message: err.to_string(),
+        }
+    }
+}
+
 pub struct GitDriveOpts<'a> {
     pub watch_dir: &'a str,
     pub remote: &'a str,
@@ -93,21 +140,19 @@ pub struct GitDriveOpts<'a> {
 }
 
 impl<'a> GitDriveOpts<'a> {
-    pub fn validate(&self) -> Result<(), io::Error> {
+    pub fn validate(&self) -> Result<()> {
         let watch_path = Path::new(self.watch_dir);
         if !watch_path.is_dir() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("not a directory: {}", self.watch_dir),
-            ));
+            return Err(GitDriveError::NoSuchDir {
+                path: self.watch_dir.to_owned(),
+            });
         }
 
         // must be a git repo
         if !watch_path.join(".git").is_dir() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("not a git directory: {}", self.watch_dir),
-            ));
+            return Err(GitDriveError::NoGitRepo {
+                path: self.watch_dir.to_owned(),
+            });
         }
 
         // remote must exist: .git/refs/remotes/<remote>
@@ -116,10 +161,9 @@ impl<'a> GitDriveOpts<'a> {
             .join(self.remote)
             .is_dir()
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("remote does not exist: {}", self.remote),
-            ));
+            return Err(GitDriveError::RemoteNotFound {
+                remote: self.remote.to_owned(),
+            });
         }
 
         // branch must exist: .git/refs/heads/<branch>
@@ -128,10 +172,9 @@ impl<'a> GitDriveOpts<'a> {
             .join(self.branch)
             .is_file()
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("branch does not exist: {}", self.branch),
-            ));
+            return Err(GitDriveError::BranchNotFound {
+                branch: self.branch.to_owned(),
+            });
         }
         Ok(())
     }
@@ -143,7 +186,7 @@ pub struct GitDrive<'a> {
 }
 
 impl<'a> GitDrive<'a> {
-    pub fn new(opts: GitDriveOpts<'a>) -> std::result::Result<GitDrive<'a>, io::Error> {
+    pub fn new(opts: GitDriveOpts<'a>) -> Result<GitDrive<'a>> {
         opts.validate()?;
 
         Ok(GitDrive {
@@ -152,7 +195,7 @@ impl<'a> GitDrive<'a> {
         })
     }
 
-    pub fn sync(&self) -> std::result::Result<(), Box<dyn Error>> {
+    pub fn sync(&self) -> Result<()> {
         log::info!("syncing ...");
 
         //
@@ -238,7 +281,7 @@ impl<'a> GitDrive<'a> {
         !self.executer.exec("git ls-remote --exit-code -h").is_err()
     }
 
-    fn resolve_conflicts(&self) -> std::result::Result<(), Box<dyn Error>> {
+    fn resolve_conflicts(&self) -> Result<()> {
         // while there still are conflicts we resolve them in our favor
         loop {
             let out = self

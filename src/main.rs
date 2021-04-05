@@ -2,6 +2,8 @@ extern crate clap;
 extern crate env_logger;
 extern crate log;
 
+mod gitdrive;
+
 use hostname;
 use std::error::Error;
 use std::thread::sleep;

@@ -3,6 +3,7 @@ extern crate env_logger;
 extern crate log;
 
 mod gitdrive;
+use gitdrive::{GitDrive, GitDriveOpts};
 
 use hostname;
 use std::error::Error;
@@ -88,7 +89,7 @@ The remote needs to be set up for password-less push or automation will fail.
     let host = hostname::get()?;
     let host = host.to_str().expect("failed to convert hostname to string");
 
-    let gitdrive = gitdrive::GitDrive::new(gitdrive::GitDriveOpts {
+    let gitdrive = GitDrive::new(GitDriveOpts {
         watch_dir,
         remote,
         branch,

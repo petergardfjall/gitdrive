@@ -1,0 +1,25 @@
+[Unit]
+Description=GitDrive -- continuously sync document changes to Git
+Documentation=https://github.com/petergardfjall/gitdrive
+Wants=network-online.target
+After=network-online.target
+ConditionUser=!root
+
+[Service]
+#
+# Environment variables to control execution
+#
+Environment="GITDRIVE_WATCH_DIR=/path/to/git-root"
+Environment="GITDRIVE_REMOTE=origin"
+Environment="GITDRIVE_BRANCH=master"
+Environment="GITDRIVE_INTERVAL=180"
+Environment="RUST_LOG=debug"
+# Uncomment to keep environment variables in a separate config file.
+# EnvironmentFile=/etc/default/gitdrive.conf
+
+# Installation path when doing `cargo install --path .`
+ExecStart=%h/.cargo/bin/gitdrive
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

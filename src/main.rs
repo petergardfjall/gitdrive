@@ -28,13 +28,14 @@ The remote needs to be set up for password-less push or automation will fail.
         )
         .arg(
             clap::Arg::with_name("watch-dir")
-                .default_value(".")
+                .env("GITDRIVE_WATCH_DIR")
                 .index(1)
-                .required(false)
+                .required(true)
                 .help("directory to watch"),
         )
         .arg(
             clap::Arg::with_name("branch")
+                .env("GITDRIVE_BRANCH")
                 .long("branch")
                 .takes_value(true)
                 .default_value("master")
@@ -42,7 +43,8 @@ The remote needs to be set up for password-less push or automation will fail.
         )
         .arg(
             clap::Arg::with_name("interval")
-                .long("period")
+                .env("GITDRIVE_INTERVAL")
+                .long("interval")
                 .takes_value(true)
                 .default_value("30")
                 .help("time in seconds between successive sync attempts"),
@@ -55,6 +57,7 @@ The remote needs to be set up for password-less push or automation will fail.
         )
         .arg(
             clap::Arg::with_name("remote")
+                .env("GITDRIVE_REMOTE")
                 .long("remote")
                 .takes_value(true)
                 .default_value("origin")

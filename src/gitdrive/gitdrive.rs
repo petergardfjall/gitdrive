@@ -119,7 +119,7 @@ impl<'a> GitDrive<'a> {
     }
 
     pub fn sync(&self) -> Result<()> {
-        log::info!("syncing ...");
+        log::info!("syncing {} ...", self.opts.watch_dir);
 
         //
         // commit local changes
@@ -136,6 +136,8 @@ impl<'a> GitDrive<'a> {
                 self.opts.hostname,
                 Utc::now().to_rfc3339()
             ))?;
+        } else {
+            log::info!("no local changes");
         }
 
         //

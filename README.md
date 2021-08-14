@@ -5,7 +5,7 @@ docs -- giving a combination of save-as-you-type functionality and simple
 synchronization of documents/files between multiple devices.
 
 Personally I use it to keep my collection of [org-mode](https://orgmode.org/)
-consistent across computers.
+files consistent across computers.
 
 Any changes to tracked files in a local git repository (the 'watch dir') are
 periodically synced with its upstream remote in an attempt to keep the local

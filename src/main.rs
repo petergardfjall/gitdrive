@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
     let cli = clap::App::new("gitdrive")
-        .version("0.0.1")
+        .version("0.1.1")
         .author("Peter Gardfjäll")
         .about(
             "Continuously sync modifications to git-tracked files: a poor man's Google docs.

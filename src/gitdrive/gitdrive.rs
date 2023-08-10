@@ -240,7 +240,9 @@ impl<'a> GitDrive<'a> {
                 self.executer
                     .exec(&format!("rm {f}.ours {f}.common {f}.theirs", f = file))?;
             }
-            self.executer.exec("git rebase --continue")?;
+            // the core.editor=true setting uses the `true` command as editor to
+            // prevent the system editor being launched to edit the commit message.
+            self.executer.exec("git -c core.editor=true rebase --continue")?;
         }
     }
 }
